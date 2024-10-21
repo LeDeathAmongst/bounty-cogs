@@ -25,42 +25,27 @@ class RoleSync(commands.Cog):
         await ctx.send_help()
 
     @rs.command(name="add")
-    async def rs_add(self, ctx: commands.Context, role: discord.Role):
-        """Add a role to sync between guild
+    async def rs_add(self, ctx: commands.Context, role: discord.Role, *guild_ids: int):
+        """Add a role to sync between guilds
 
         The role argument must be a role mention or ID.
-        The guilds argument accepts guild IDs"""
-        view = GuildSelectView(ctx)
-        if not view.guilds or len(view.guilds) < 2:
-            return await ctx.send(
-                """
-                Not enough guilds found to select where roles can be synced.
-                The user and the bot must have the following permissions in the guilds:
-                - manage_guild
-                - manage_roles
-                - manage_permissions
-                """.strip()
-            )
-        msg = await ctx.send(
-            "Please select a max of 2 guilds from the below list where the given role will be synced.",
-            view=view,
-        )
-        if await view.wait():
-            [setattr(item, "disabled", True) for item in view.children]
-            await msg.edit(view=view)
-            return await ctx.send("Sync cancelled.")
+        The guild_ids argument accepts multiple guild IDs"""
+        if len(guild_ids) < 1:
+            return await ctx.send("Please provide at least one guild ID to sync with.")
 
-        guilds = view.chosen_guilds
+        guilds = [self.bot.get_guild(gid) for gid in guild_ids if self.bot.get_guild(gid)]
+        if not guilds:
+            return await ctx.send("No valid guilds found with the provided IDs.")
 
         async with self.config.guild(ctx.guild).roles() as roles:
-            roles[role.id] = list(
-                set(roles.get(role.id, [])).union(map(attrgetter("id"), guilds))
+            roles[str(role.id)] = list(
+                set(roles.get(str(role.id), [])).union(map(lambda g: g.id, guilds))
             )
 
             for guild in guilds:
                 async with self.config.guild(guild).synced_roles() as synced_roles:
-                    if not synced_roles.get(str(role.id)):
-                        synced_roles[role.id] = (
+                    if str(role.id) not in synced_roles:
+                        synced_roles[str(role.id)] = (
                             await guild.create_role(
                                 name=role.name,
                                 permissions=role.permissions,
@@ -71,16 +56,20 @@ class RoleSync(commands.Cog):
                             )
                         ).id
 
-            await ctx.tick()
-            return await ctx.send(f"Synced {role.mention} in given guilds")
+        await ctx.tick()
+        return await ctx.send(f"Synced {role.mention} in the specified guilds")
 
     @rs.command(name="remove")
-    async def rs_remove(self, ctx: commands.Context, role: discord.Role):
+    async def rs_remove(self, ctx: commands.Context, role: discord.Role, *guild_ids: int):
+        """Remove a role from sync in specified guilds
+
+        If no guild IDs are provided, the role will be removed from all synced guilds."""
         async with self.config.guild(ctx.guild).roles() as roles:
             if str(role.id) not in roles:
                 return await ctx.send("This role is not synced to any guilds.")
 
-            for gid in roles[str(role.id)]:
+            guilds_to_remove = guild_ids if guild_ids else roles[str(role.id)]
+            for gid in guilds_to_remove:
                 guild = self.bot.get_guild(gid)
                 if guild is None:
                     continue
@@ -91,9 +80,15 @@ class RoleSync(commands.Cog):
                         if sr is None:
                             continue
                         await sr.delete(reason=f"Unsynced from {ctx.guild.name}")
+                        del synced_roles[str(role.id)]
 
-            await ctx.tick()
-            return await ctx.send(f"Removed {role.mention} from sync")
+                roles[str(role.id)].remove(gid)
+
+            if not roles[str(role.id)]:
+                del roles[str(role.id)]
+
+        await ctx.tick()
+        return await ctx.send(f"Removed {role.mention} from sync in specified guilds")
 
     @rs.command(name="list")
     async def rs_list(self, ctx: commands.Context):
