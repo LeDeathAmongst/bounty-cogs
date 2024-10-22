@@ -423,7 +423,7 @@ class BanAppeal(commands.Cog):
         User `{guild_name}` to be replaced with the server name
         """
         async with self.config.guild(ctx.guild).appeal_messages() as messages:
-            messages[response_type.lower()].append(response)
+            messages[response_type.lower()] = response
         await ctx.send(
             f"Updated `{response_type.replace('_', ' ')}` response: {response}"
         )
