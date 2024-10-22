@@ -99,7 +99,7 @@ class BanAppeal(commands.Cog):
         if not ModCog:
             log.debug("Mod cog not found")
             return
-        if ctx.command.qualified_name.lower() != "ban" or ctx.cog != ModCog:
+        if ctx.command.qualified_name.lower() != "ban" or ctx.comamnd.qualifified_name.lower() != "globalban" or ctx.cog != ModCog:
             # log.debug("Not a ban command")
             return
 
