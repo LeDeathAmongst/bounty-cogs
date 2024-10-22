@@ -11,8 +11,9 @@ from .views import BannedGuildsSelect, AcceptRejectButton, ViewDisableOnTimeout
 from discord.utils import maybe_coroutine
 from redbot.core.utils import chat_formatting as cf
 import logging
+from Star_Utils import Cog, CogsUtils
 
-log = logging.getLogger("red.bounty.banappeal")
+log = logging.getLogger("star.banappeal")
 
 P = typing.ParamSpec("P")
 T = typing.TypeVar("T")
@@ -58,9 +59,10 @@ def catch(
     return decorator(func)
 
 
-class BanAppeal(commands.Cog):
+class BanAppeal(Cog):
     def __init__(self, bot: Red):
         self.bot = bot
+        self.logs = CogsUtils.get_logger("BanAppeal")
         self.config = Config.get_conf(
             self, identifier=1234567890, force_registration=True
         )
